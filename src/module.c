@@ -50,10 +50,10 @@ void *BCL_ThreadMain(void *arg) {
 
         char* next_py = PyExecCode(code, func, farg);
 
-        printf("Code ran and returned: '%s'\n", next_py);
 
         // Do we need to chain to another function
-        if (strlen(next_py) > 0) {
+        if (NULL != next_py && strlen(next_py) > 0) {
+                printf("Code ran and returned: '%s'\n", next_py);
                 runPyFromRedis(ctx, NULL, 0, next_py);
         }
 
@@ -94,6 +94,73 @@ int startBlockingClient(RedisModuleCtx *ctx,
         return 0;
 }
 
+char *strstrip(char *s)
+{
+        size_t size;
+        char *end;
+
+        size = strlen(s);
+
+        if (!size)
+                return s;
+
+        end = s + size - 1;
+        while (end >= s && isspace(*end))
+                end--;
+        *(end + 1) = '\0';
+
+        while (*s && isspace(*s))
+                s++;
+
+        return s;
+}
+
+char* extractImportedPackageName(char* token) {
+        char* m = strstr(token, "import ");
+        m += strlen("import ");
+        m = strstrip(m);
+        return m;
+}
+
+int importSingleModule(char* token, PyObject *pGlobal) {
+        if (strstr(token, "import ") - token == 0) {
+                // Starts with import ...
+                char* package = extractImportedPackageName(token);
+
+                if (NULL != package) {
+                        printf("Importing package %s\n", package);
+                        PyObject *impmod = PyImport_ImportModule(package);
+                        if (NULL == impmod)
+                                printf("Package %s not found\n", package);
+                        else {
+                                printf("Package %s imported\n", package);
+                                PyMapping_SetItemString(pGlobal, package, impmod);
+                                return 1;
+                        }
+                }
+        }
+
+        return 0;
+}
+
+char* importModules(char* code, PyObject *pGlobal) {
+        char* trimmed_code = (char*)RedisModule_Alloc(sizeof(char)*(strlen(code) + 1));
+        trimmed_code[0] = '\0';
+
+        char* token = strtok(code, "\n");
+
+        while( token != NULL ) {
+                printf( "token: %s\n", token);
+                int imported = importSingleModule(token, pGlobal);
+                if (!imported) {
+                  sprintf(trimmed_code, "%s%s\n", trimmed_code, token);
+                }
+                token = strtok(NULL, "\n");
+        }
+
+        return trimmed_code;
+}
+
 char* PyExecCode(char* code, char* func, char* arg)
 {
         printf("Starting PyExecCode: running %s(%s) with code:\n%s\n", func, arg, code);
@@ -104,6 +171,12 @@ char* PyExecCode(char* code, char* func, char* arg)
 
         Py_Initialize();
         PyModule_AddStringConstant(pNewMod, "__file__", "");
+
+        // Extract and import all modules used by the code
+        char* code_copy = (char*)RedisModule_Alloc(sizeof(char)*(strlen(code) + 1));
+        memcpy(code_copy, code, strlen(code));
+        code_copy[strlen(code)] = '\0';
+        code = importModules(code_copy, pGlobal);
 
         //Get the dictionary object from my module so I can pass this to PyRun_String
         pLocal = PyModule_GetDict(pNewMod);
@@ -142,12 +215,11 @@ char* PyExecCode(char* code, char* func, char* arg)
                 rv = strcpy(rv, ret_str);
 
                 printf("Returned val: %s\n", rv);
+                Py_DECREF(pValue);
         }
         else {
                 printf("NULL pValue returned\n");
         }
-
-        Py_DECREF(pValue);
 
         Py_XDECREF(pFunc);
         // Noooooooooooo u don't! we have one global temp module ... Py_DECREF(pNewMod);
@@ -297,7 +369,7 @@ int PyRunCommand_RedisCommand(RedisModuleCtx *ctx, RedisModuleString **argv, int
         runPyFromRedis(ctx, argv, argc, next_py);
 
         printf("\nDone running python function chain, threads may still be running\n\n");
-        next_py = "Done";
+        next_py = "Py chain done";
 
         // Return final value (not really something to write home about)
         RedisModule_ReplyWithStringBuffer(ctx, next_py, strlen(next_py));
