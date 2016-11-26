@@ -18,7 +18,7 @@ void runPyFromRedis(RedisModuleCtx *ctx, RedisModuleString **argv, int argc, cha
 //Create a new module object
 PyObject *pNewMod = NULL;
 
-char* next_py_to_run = NULL;
+// char* next_py_to_run = NULL;
 
 int BCL_Reply(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
         REDISMODULE_NOT_USED(argv);
@@ -53,9 +53,19 @@ void *BCL_ThreadMain(void *arg) {
 
         // Action starts here, note the next_py_to_run triggers a new thread
         // invoked by runPyFromRedis
-        next_py_to_run = PyExecCode(code, func, farg);
+        // next_py_to_run = PyExecCode(code, func, farg);
 
-        RedisModule_UnblockClient(bc, next_py_to_run);
+        char* next_py = PyExecCode(code, func, farg);
+
+        printf("Code ran and returned: '%s'\n", next_py);
+
+        // Do we need to chain to another function
+        if (strlen(next_py) > 0) {
+                runPyFromRedis(ctx, NULL, 0, next_py);
+        }
+
+        int mockint = 0;
+        RedisModule_UnblockClient(bc, &mockint);
         return NULL;
 }
 
@@ -154,7 +164,7 @@ char* PyExecCode(char* code, char* func, char* arg)
 void runPyFromRedis(RedisModuleCtx *ctx, RedisModuleString **argv, int argc, char* next_py) {
 
         // Kill it so we won't get multiple calls while running
-        next_py_to_run = NULL;
+        // next_py_to_run = NULL;
 
         printf("Next py is: '%s'\n", next_py);
 
@@ -198,19 +208,19 @@ void runPyFromRedis(RedisModuleCtx *ctx, RedisModuleString **argv, int argc, cha
                                             next_func_arg);
 
                         // This should be legit, as runPyFromRedis dispatches a thread
-                        while (NULL == next_py_to_run) {
-                            sleep(1);
-                        }
+                        // while (NULL == next_py_to_run) {
+                        //     sleep(1);
+                        // }
 
-                        printf("Code ran and returned: '%s'\n", next_py_to_run);
-
-                        // Do we need to chain to another function
-                        if (strlen(next_py_to_run) > 0) {
-                                char* _c_next_py_to_run = (char*)malloc(strlen(next_py_to_run) + 1);
-                                strcpy(_c_next_py_to_run, next_py_to_run);
-                                runPyFromRedis(ctx, NULL, 0, _c_next_py_to_run);
-                                free(_c_next_py_to_run);
-                        }
+                        // printf("Code ran and returned: '%s'\n", next_py_to_run);
+                        //
+                        // // Do we need to chain to another function
+                        // if (strlen(next_py_to_run) > 0) {
+                        //         char* _c_next_py_to_run = (char*)malloc(strlen(next_py_to_run) + 1);
+                        //         strcpy(_c_next_py_to_run, next_py_to_run);
+                        //         runPyFromRedis(ctx, NULL, 0, _c_next_py_to_run);
+                        //         free(_c_next_py_to_run);
+                        // }
                 }
         }
         else {
