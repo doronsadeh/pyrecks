@@ -76,9 +76,9 @@ Once it returns the next function would be looked up in Redis using its name as 
     ...
     import package
 
-    def function_name("string" or @key):
+    def function_name("string" or "@key"):
     	... code to run ...
-    	return 'next_function_name(%s)' % (some value or variable, or @key)
+    	return 'next_function_name(%s)' % (some value or variable, or "@key")
 
     def _utility_function():
       ...
@@ -95,4 +95,5 @@ __Note!__ Access to Redis via network APIs is forbidden.
 - Support var args in kernel functions
 - Consider a _yield_ based model
 
+---
 Contact me at doron.shamia@gmail.com

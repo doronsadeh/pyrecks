@@ -50,7 +50,6 @@ void *BCL_ThreadMain(void *arg) {
 
         char* next_py = PyExecCode(code, func, farg);
 
-
         // Do we need to chain to another function
         if (NULL != next_py && strlen(next_py) > 0) {
                 printf("Code ran and returned: '%s'\n", next_py);
@@ -153,7 +152,7 @@ char* importModules(char* code, PyObject *pGlobal) {
                 printf( "token: %s\n", token);
                 int imported = importSingleModule(token, pGlobal);
                 if (!imported) {
-                  sprintf(trimmed_code, "%s%s\n", trimmed_code, token);
+                        sprintf(trimmed_code, "%s%s\n", trimmed_code, token);
                 }
                 token = strtok(NULL, "\n");
         }
@@ -229,6 +228,23 @@ char* PyExecCode(char* code, char* func, char* arg)
 
 }
 
+char* getValueByKey(RedisModuleCtx *ctx, char* key) {
+        char* value = NULL;
+        RedisModuleString* rms = RedisModule_CreateString(ctx, key, strlen(key));
+        RedisModuleCallReply *reply = RedisModule_Call(ctx, "GET", "s", rms);
+
+        if (NULL != reply) {
+                size_t len;
+                value = RedisModule_CallReplyStringPtr(reply, &len);
+                if (NULL != value) {
+                        value = strstrip(value);
+                        printf("Got value %s by key %s\n", value, key);
+                }
+        }
+
+        return value;
+}
+
 void runPyFromRedis(RedisModuleCtx *ctx, RedisModuleString **argv, int argc, char* next_py) {
 
         printf("Next py is: '%s'\n", next_py);
@@ -247,34 +263,32 @@ void runPyFromRedis(RedisModuleCtx *ctx, RedisModuleString **argv, int argc, cha
         next_func_arg[rpar - lpar - 3] = '\0';
         printf("Next function arg is: '%s'\n", next_func_arg);
 
-        RedisModuleString* rms = RedisModule_CreateString(ctx, next_func, strlen(next_func));
-
-        // Get the next chunk of py code from Redis
-        RedisModuleCallReply *reply = RedisModule_Call(ctx, "GET", "s", rms);
-
-        // printf("Reply type: %d\n", RedisModule_CallReplyType(reply));
-
-        if (NULL != reply) {
-                size_t len;
-                char* code = RedisModule_CallReplyStringPtr(reply, &len);
-                if (NULL != code) {
-                        printf("Next code is at: %s, code is:\n%s\n", next_py, code);
-
-                        char* xcode = (char*)RedisModule_Alloc(sizeof(char)*(strlen(code) + strlen(next_func) + 1024));
-                        // sprintf(xcode, "%s\n%s", code, next_py);
-                        sprintf(xcode, "%s", code);
-
-                        printf("Dispatching thread: %s\n", xcode);
-
-                        startBlockingClient(ctx,
-                                            (long long)(1*1000),
-                                            xcode,
-                                            next_func,
-                                            next_func_arg);
+        if (next_func_arg[0] == '@') {
+                // It's a Redis KEY, we need to get the value
+                char* value = getValueByKey(ctx, strstrip(next_func_arg + 1));
+                if (NULL == next_func_arg) {
+                        printf("Cannot get %s value, aborting chain\n", value);
+                }
+                else {
+                        next_func_arg = value;
                 }
         }
-        else {
-                printf("NULL reply when GET %s\n", (char*)RedisModule_StringPtrLen(rms, NULL));
+
+        char* code = getValueByKey(ctx, next_func);
+        if (NULL != code) {
+                printf("Next code is at: %s, code is:\n%s\n", next_py, code);
+
+                char* xcode = (char*)RedisModule_Alloc(sizeof(char)*(strlen(code) + strlen(next_func) + 1024));
+                // sprintf(xcode, "%s\n%s", code, next_py);
+                sprintf(xcode, "%s", code);
+
+                printf("Dispatching thread: %s\n", xcode);
+
+                startBlockingClient(ctx,
+                                    (long long)(1*1000),
+                                    xcode,
+                                    next_func,
+                                    next_func_arg);
         }
 }
 
