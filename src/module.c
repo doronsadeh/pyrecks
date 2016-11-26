@@ -9,8 +9,6 @@
 #include <unistd.h>
 #include <Python.h>
 
-// TODO handle free for all mallocs
-
 // Prototypes, cause its C, and C is shit
 char* PyExecCode(char* code, char* func, char* arg);
 void runPyFromRedis(RedisModuleCtx *ctx, RedisModuleString **argv, int argc, char* next_py);
@@ -142,7 +140,7 @@ char* PyExecCode(char* code, char* func, char* arg)
         char* rv = NULL;
         if (NULL != pValue) {
                 char* ret_str = PyString_AsString(pValue);
-                rv = (char*)malloc(strlen(ret_str) + 1);
+                rv = (char*)RedisModule_Alloc(sizeof(char)*(strlen(ret_str) + 1));
                 rv = strcpy(rv, ret_str);
 
                 printf("Returned val: %s\n", rv);
@@ -171,13 +169,13 @@ void runPyFromRedis(RedisModuleCtx *ctx, RedisModuleString **argv, int argc, cha
         int lpar = strstr(next_py, "(") - next_py;
         int rpar = strstr(next_py, ")") - next_py;
 
-        char* next_func = (char*)malloc(lpar + 1);
+        char* next_func = (char*)RedisModule_Alloc(sizeof(char)*(lpar + 1));
         strncpy(next_func, next_py, lpar);
         next_func[lpar] = '\0';
         printf("Next function is: '%s'\n", next_func);
 
         // TODO this is a very shaky code, we need to strip leading/trailing dquotes w/o this +-2
-        char* next_func_arg = (char*)malloc(rpar - lpar + 1);
+        char* next_func_arg = (char*)RedisModule_Alloc(sizeof(char)*(rpar - lpar + 1));
         strncpy(next_func_arg, strstr(next_py, "(") + 2, rpar - lpar);
         next_func_arg[rpar - lpar - 3] = '\0';
         printf("Next function arg is: '%s'\n", next_func_arg);
@@ -195,7 +193,7 @@ void runPyFromRedis(RedisModuleCtx *ctx, RedisModuleString **argv, int argc, cha
                 if (NULL != code) {
                         printf("Next code is at: %s, code is:\n%s\n", next_py, code);
 
-                        char* xcode = (char*)malloc(strlen(code) + strlen(next_func) + 1024);
+                        char* xcode = (char*)RedisModule_Alloc(sizeof(char)*(strlen(code) + strlen(next_func) + 1024));
                         // sprintf(xcode, "%s\n%s", code, next_py);
                         sprintf(xcode, "%s", code);
 
