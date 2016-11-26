@@ -40,6 +40,8 @@ Invoke redis-cli and SET the following sample functions (functions can also be f
 
     SET func2 "import time \ndef func2(x):\n\tprint 'func2 got %s' % x\n\ttime.sleep(10)\n\tx = x + '-and-we-are-done'\n\tprint 'func2 says %s' % x\n\treturn ''"
 
+Make sure the script at ~/dev/pyrecks/start.py calls your first function of choice, e.g. calls _func0_ by returning a call string such as : _return 'func0("start ...")'_. Note the string parameter for _func0_ can be anything.
+
 From redis-cli run the module command
 
     PYLD.pyrun start start

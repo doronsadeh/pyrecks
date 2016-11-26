@@ -1,2 +1,2 @@
 def start():
-    return 'func0("5")'
+    return 'func0("start ...")'
