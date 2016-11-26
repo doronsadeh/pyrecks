@@ -22,27 +22,27 @@ Please use the same setup in order to avoid any misconfiguration.
 
 If you have any problems make sure the Redis module _Makefile_ contains the correct paths to the python runtime as installed on your OS.
 
-    1 Clone and install the latests Redis from github
-    2 Clone this project (we'll assume you'll be cloning it into ~/dev/pyrecks)
-    3 Run make in ~/dev/pyrecks/src to get a module.so file
-    4 Set PYTHONPATH to ~/dev/pyrecks/py
+1. Clone and install the latests Redis from github
+2. Clone this project (we'll assume you'll be cloning it into ~/dev/pyrecks)
+3. Run make in ~/dev/pyrecks/src to get a module.so file
+4. Set PYTHONPATH to ~/dev/pyrecks/py
 
 ### Running a Simple Example
-- Run Redis loading the compiled module
+Run Redis loading the compiled module
 
-      redis-server --loadmodule <path to module.so>
+    redis-server --loadmodule <path to module.so>
 
-- Invoke redis-cli and SET the following sample functions (functions can also be found under ~/dev/pyrecks/py):
+Invoke redis-cli and SET the following sample functions (functions can also be found under ~/dev/pyrecks/py):
 
-      SET func0 "def func0(x):\n\tprint 'func0 got %s' % x\n\tx = x + '3'\n\tprint 'func0 says %s' % x\n\treturn 'func1(\"say hi to func1 with %s\")' % x"
+    SET func0 "def func0(x):\n\tprint 'func0 got %s' % x\n\tx = x + '3'\n\tprint 'func0 says %s' % x\n\treturn 'func1(\"say hi to func1 with %s\")' % x"
 
-      SET func1 "def func1(x):\n\tprint 'func1 got %s' % x\n\tx = x * 3\n\tprint 'func1 says %s' % x\n\treturn 'func2(\"say hi to func2 with %s\")' % x\n"
+    SET func1 "def func1(x):\n\tprint 'func1 got %s' % x\n\tx = x * 3\n\tprint 'func1 says %s' % x\n\treturn 'func2(\"say hi to func2 with %s\")' % x\n"
 
-      SET func2 "import time \ndef func2(x):\n\tprint 'func2 got %s' % x\n\ttime.sleep(10)\n\tx = x + '-and-we-are-done'\n\tprint 'func2 says %s' % x\n\treturn ''"
+    SET func2 "import time \ndef func2(x):\n\tprint 'func2 got %s' % x\n\ttime.sleep(10)\n\tx = x + '-and-we-are-done'\n\tprint 'func2 says %s' % x\n\treturn ''"
 
-- From redis-cli run the module command
+From redis-cli run the module command
 
-      PYLD.pyrun start start
+    PYLD.pyrun start start
 
 See functions' output as it is printed to the terminal window running the redis-server. Note the redis-cli should return immediately with "Py chain done", allowing further commands to be invoked while the functions are still running.
 
@@ -91,7 +91,8 @@ __Note!__ 'from X import Y' form is not currently supported.
 
 __Note!__ Access to Redis via network APIs is forbidden.
 
-
 ### Future Development
 - Support var args in kernel functions
 - Consider a _yield_ based model
+
+Contact me at doron.shamia@gmail.com
