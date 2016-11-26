@@ -5,4 +5,4 @@ def func2(x):
     return ''
 
 # Reduced version
-def func2(x):\n\tprint 'func2 got %s' % x\n\tx = x + '-and-we-are-done'\n\tprint 'func2 says %s' % x\n\treturn ''\n
+# SET func2 "def func2(x):\n\tprint 'func2 got %s' % x\n\tx = x + '-and-we-are-done'\n\tprint 'func2 says %s' % x\n\treturn ''\n"

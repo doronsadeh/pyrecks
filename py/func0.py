@@ -5,4 +5,4 @@ def func0(x):
     return 'func1(\"say hi to func1 with %s\")' % x
 
 # Reduced version
-def func0(x):\n\tprint 'func0 got %s' % x\n\tx = x + '3'\n\tprint 'func0 says %s' % x\n\treturn 'func1(\"say hi to func1 with %s\")' % x
+# SET func0 "def func0(x):\n\tprint 'func0 got %s' % x\n\tx = x + '3'\n\tprint 'func0 says %s' % x\n\treturn 'func1(\"say hi to func1 with %s\")' % x"
