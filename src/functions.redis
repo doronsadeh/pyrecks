@@ -1,3 +1,0 @@
-SET func_next_one "def func_next_one(x):\n\tx=x+'1'\n\tprint x\n\treturn 'func0(\"7\")'\n"
-SET func0 "def func0(x):\n\tx=x+'3'\n\tprint x\n\treturn 'func1(\"hellowwwwwwwwwww\")'\n"
-SET func1 "def func1(x):\n\tx=x*3\n\tprint x\n\treturn ''\n"
