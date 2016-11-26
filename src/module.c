@@ -16,24 +16,23 @@ void runPyFromRedis(RedisModuleCtx *ctx, RedisModuleString **argv, int argc, cha
 //Create a new module object
 PyObject *pNewMod = NULL;
 
-// char* next_py_to_run = NULL;
-
-int BCL_Reply(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
-        REDISMODULE_NOT_USED(argv);
-        REDISMODULE_NOT_USED(argc);
-        char *msg = RedisModule_GetBlockedClientPrivateData(ctx);
-        return RedisModule_ReplyWithSimpleString(ctx, msg);
-}
-
-int BCL_Timeout(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
-        REDISMODULE_NOT_USED(argv);
-        REDISMODULE_NOT_USED(argc);
-        return RedisModule_ReplyWithSimpleString(ctx, "Request timed-out");
-}
-
-void BCL_FreeData(void *privdata) {
-        RedisModule_Free(privdata);
-}
+// [DISABLED BLOCKING CLIENT]
+// int BCL_Reply(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
+//         REDISMODULE_NOT_USED(argv);
+//         REDISMODULE_NOT_USED(argc);
+//         char *msg = RedisModule_GetBlockedClientPrivateData(ctx);
+//         return RedisModule_ReplyWithSimpleString(ctx, msg);
+// }
+//
+// int BCL_Timeout(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
+//         REDISMODULE_NOT_USED(argv);
+//         REDISMODULE_NOT_USED(argc);
+//         return RedisModule_ReplyWithSimpleString(ctx, "Request timed-out");
+// }
+//
+// void BCL_FreeData(void *privdata) {
+//         RedisModule_Free(privdata);
+// }
 
 /* The thread entry point that actually executes the blocking part
  * of the command HELLO.BLOCK. */
@@ -49,10 +48,6 @@ void *BCL_ThreadMain(void *arg) {
 
         printf("Thread runs function: %s(%s)\n", func, farg);
 
-        // Action starts here, note the next_py_to_run triggers a new thread
-        // invoked by runPyFromRedis
-        // next_py_to_run = PyExecCode(code, func, farg);
-
         char* next_py = PyExecCode(code, func, farg);
 
         printf("Code ran and returned: '%s'\n", next_py);
@@ -62,8 +57,9 @@ void *BCL_ThreadMain(void *arg) {
                 runPyFromRedis(ctx, NULL, 0, next_py);
         }
 
-        int mockint = 0;
-        // [DEBUG] RedisModule_UnblockClient(bc, &mockint);
+        // [DISABLED BLOCKING CLIENT]
+        // int mockint = 0;
+        // RedisModule_UnblockClient(bc, &mockint);
         return NULL;
 }
 
@@ -73,7 +69,7 @@ int startBlockingClient(RedisModuleCtx *ctx,
                         char* func,
                         char* arg) {
         pthread_t tid;
-        // [DEBUG]
+        // [DISABLED BLOCKING CLIENT]
         // RedisModuleBlockedClient *bc = RedisModule_BlockClient(ctx,
         //                                                        BCL_Reply,
         //                                                        BCL_Timeout,
@@ -83,7 +79,7 @@ int startBlockingClient(RedisModuleCtx *ctx,
          * to the thread. However we need to pass arguments to the thread:
          * the delay and a reference to the blocked client handle. */
         void **targ = RedisModule_Alloc(sizeof(void*)*5);
-        // [DEBUG] targ[0] = bc;
+        // [DISABLED BLOCKING CLIENT] targ[0] = bc;
         targ[0] = NULL;
         targ[1] = func;
         targ[2] = arg;
@@ -91,7 +87,7 @@ int startBlockingClient(RedisModuleCtx *ctx,
         targ[4] = ctx;
 
         if (pthread_create(&tid, NULL, BCL_ThreadMain, targ) != 0) {
-                // [DEBUG] RedisModule_AbortBlock(bc);
+                // [DISABLED BLOCKING CLIENT] RedisModule_AbortBlock(bc);
                 return RedisModule_ReplyWithError(ctx,"-ERR Can't start thread");
         }
 
@@ -163,9 +159,6 @@ char* PyExecCode(char* code, char* func, char* arg)
 
 void runPyFromRedis(RedisModuleCtx *ctx, RedisModuleString **argv, int argc, char* next_py) {
 
-        // Kill it so we won't get multiple calls while running
-        // next_py_to_run = NULL;
-
         printf("Next py is: '%s'\n", next_py);
 
         int lpar = strstr(next_py, "(") - next_py;
@@ -206,21 +199,6 @@ void runPyFromRedis(RedisModuleCtx *ctx, RedisModuleString **argv, int argc, cha
                                             xcode,
                                             next_func,
                                             next_func_arg);
-
-                        // This should be legit, as runPyFromRedis dispatches a thread
-                        // while (NULL == next_py_to_run) {
-                        //     sleep(1);
-                        // }
-
-                        // printf("Code ran and returned: '%s'\n", next_py_to_run);
-                        //
-                        // // Do we need to chain to another function
-                        // if (strlen(next_py_to_run) > 0) {
-                        //         char* _c_next_py_to_run = (char*)malloc(strlen(next_py_to_run) + 1);
-                        //         strcpy(_c_next_py_to_run, next_py_to_run);
-                        //         runPyFromRedis(ctx, NULL, 0, _c_next_py_to_run);
-                        //         free(_c_next_py_to_run);
-                        // }
                 }
         }
         else {
