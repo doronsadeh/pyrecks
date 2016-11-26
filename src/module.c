@@ -63,7 +63,7 @@ void *BCL_ThreadMain(void *arg) {
         }
 
         int mockint = 0;
-        RedisModule_UnblockClient(bc, &mockint);
+        // [DEBUG] RedisModule_UnblockClient(bc, &mockint);
         return NULL;
 }
 
@@ -73,23 +73,25 @@ int startBlockingClient(RedisModuleCtx *ctx,
                         char* func,
                         char* arg) {
         pthread_t tid;
-        RedisModuleBlockedClient *bc = RedisModule_BlockClient(ctx,
-                                                               BCL_Reply,
-                                                               BCL_Timeout,
-                                                               BCL_FreeData,
-                                                               timeout);
+        // [DEBUG]
+        // RedisModuleBlockedClient *bc = RedisModule_BlockClient(ctx,
+        //                                                        BCL_Reply,
+        //                                                        BCL_Timeout,
+        //                                                        BCL_FreeData,
+        //                                                        timeout);
         /* Now that we setup a blocking client, we need to pass the control
          * to the thread. However we need to pass arguments to the thread:
          * the delay and a reference to the blocked client handle. */
         void **targ = RedisModule_Alloc(sizeof(void*)*5);
-        targ[0] = bc;
+        // [DEBUG] targ[0] = bc;
+        targ[0] = NULL;
         targ[1] = func;
         targ[2] = arg;
         targ[3] = code;
         targ[4] = ctx;
 
         if (pthread_create(&tid, NULL, BCL_ThreadMain, targ) != 0) {
-                RedisModule_AbortBlock(bc);
+                // [DEBUG] RedisModule_AbortBlock(bc);
                 return RedisModule_ReplyWithError(ctx,"-ERR Can't start thread");
         }
 
