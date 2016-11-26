@@ -47,10 +47,14 @@ If you have any problems make sure the Redis module _Makefile_ contains the corr
 See functions' output as it is printed to the terminal window running the redis-server. Note the redis-cli should return immediately with "Py chain done", allowing further commands to be invoked while the functions are still running.
 
 ### Details
-#### What is a Pyrecks Python Kernel
+#### Writing a Pyrecks Python Kernel
 A Pyrecks kernel is a function optionally preceded by some import statements. The function has some restrictions (see below), and _must_ return a string carrying a function call, or an empty one (to stop the kernel chain).
 
 A kernel may use any other utility functions as long as the one invoked by the Pyrecks chain returns the next function call as state above.
+
+Each kernel function _must_ be pre-SET into Redis, using its name as KEY.
+
+Any Redis-stored data items (i.e. keys, with values) required by the kernel functions _must_ be in Redis when the kernel function runs, else it would fail, stopping the kernel chain.
 
 ##### Example
     import time
@@ -65,7 +69,7 @@ The above function imports the _time_ package, gets a single string (or KEY whos
 
 It then runs a some string calculations, returning another string comprising the Python call to the next function in the chain. Note that it uses a computed value to build the _func1_ call. Such computed value may also be a KEY name.
 
-Once it returns the next function would be looked up using its name as KEY (e.g. _func1_), executing the call as depicted in the returned string.
+Once it returns the next function would be looked up in Redis using its name as KEY (e.g. _func1_), executing the call as depicted in the returned string, and so forth.
 
 ##### Kernel Function Format
     import package
