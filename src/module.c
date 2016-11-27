@@ -183,6 +183,7 @@ char* PyExecCode(char* code, char* func, char* arg)
         pLocal = PyModule_GetDict(pNewMod);
 
         //Define my function in the newly created module
+        printf("\n------------------------ Kernel Running ------------------------\n");
         pValue = PyRun_String(code, Py_file_input, pGlobal, pLocal);
 
         //pValue would be null if the Python syntax is wrong, for example
@@ -222,6 +223,8 @@ char* PyExecCode(char* code, char* func, char* arg)
                 printf("[PyExecCode] Python kernel returned no value, please check kernel correctness\n");
         }
 
+        printf("\n----------------------------------------------------------------\n");
+
         Py_XDECREF(pFunc);
         // Noooooooooooo u don't! we have one global temp module ... Py_DECREF(pNewMod);
         Py_Finalize();
@@ -237,10 +240,13 @@ char* getValueByKey(RedisModuleCtx *ctx, char* key) {
 
         if (NULL != reply) {
                 size_t len;
-                value = RedisModule_CallReplyStringPtr(reply, &len);
+                const char* replyStr = RedisModule_CallReplyStringPtr(reply, &len);
+                value = (char*)RedisModule_Alloc(sizeof(char)*(strlen(replyStr) + 1));
+                strcpy(value, replyStr);
+                value[strlen(replyStr)] = '\0';
                 if (NULL != value) {
                         value = strstrip(value);
-                        printf("[REDIS] Got value %s by key %s\n", value, key);
+                        printf("[REDIS] Got value for key [%s]:\n%s\n\n", key, value);
                 }
         }
 
@@ -295,7 +301,7 @@ void runPyFromRedis(RedisModuleCtx *ctx, RedisModuleString **argv, int argc, cha
 }
 
 
-char* runPyMainModule(char** argv, int argc) {
+char* runPyMainModule(RedisModuleString** argv, int argc) {
         PyObject *pName, *pModule, *pDict, *pFunc;
         PyObject *pArgs, *pValue;
         int i;
@@ -353,14 +359,14 @@ char* runPyMainModule(char** argv, int argc) {
                 else {
                         if (PyErr_Occurred())
                                 PyErr_Print();
-                        fprintf(stderr, "[runPyMainModule] Cannot find function \"%s\"\n", argv[2]);
+                        fprintf(stderr, "[runPyMainModule] Cannot find function \"%s\"\n", (char*)RedisModule_StringPtrLen(argv[2], NULL));
                 }
                 Py_XDECREF(pFunc);
                 Py_DECREF(pModule);
         }
         else {
                 PyErr_Print();
-                fprintf(stderr, "[runPyMainModule] Failed to load \"%s\"\n", argv[1]);
+                fprintf(stderr, "[runPyMainModule] Failed to load \"%s\"\n", (char*)RedisModule_StringPtrLen(argv[1], NULL));
                 return NULL;
         }
 
@@ -379,7 +385,7 @@ int PyRunCommand_RedisCommand(RedisModuleCtx *ctx, RedisModuleString **argv, int
 
         // Start with a main python read from file
         char* next_py = runPyMainModule(argv, argc);
-        printf("[PYLD.pyrun] Next Python kernel to run: %s, %d\n", next_py, strlen(next_py));
+        printf("[PYLD.pyrun] Next Python kernel to run: %s, %d\n", next_py, (int)strlen(next_py));
 
         // Get the next function to run, and start the chain
         runPyFromRedis(ctx, argv, argc, next_py);
