@@ -34,6 +34,8 @@ Run Redis loading the compiled module
 
 Invoke redis-cli and SET the following sample functions (functions can also be found under ~/dev/pyrecks/py):
 
+__Note you can run _~/dev/pyrecks/tools/install.py ~/dev/pyrecks/py_ to SET all the sample kernels provided into Redis. Or manually enter them as specified below.__
+
     SET func0 "def func0(x):\n\tprint 'func0 got %s' % x\n\tx = x + '3'\n\tprint 'func0 says %s' % x\n\treturn 'func1(\"say hi to func1 with %s\")' % x"
 
     SET func1 "def func1(x):\n\tprint 'func1 got %s' % x\n\tx = x * 3\n\tprint 'func1 says %s' % x\n\treturn 'func2(\"say hi to func2 with %s\")' % x\n"
