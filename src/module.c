@@ -46,14 +46,17 @@ void *BCL_ThreadMain(void *arg) {
 
         RedisModule_Free(targ);
 
-        printf("Thread runs function: %s(%s)\n", func, farg);
+        printf("[Thread] Thread runs function: %s(%s)\n", func, farg);
 
         char* next_py = PyExecCode(code, func, farg);
 
         // Do we need to chain to another function
         if (NULL != next_py && strlen(next_py) > 0) {
-                printf("Code ran and returned: '%s'\n", next_py);
+                printf("[Thread] Code ran and returned: '%s'\n", next_py);
                 runPyFromRedis(ctx, NULL, 0, next_py);
+        }
+        else {
+          printf("\n--------------------------\nPython kernel chain done\n--------------------------\n");
         }
 
         // [DISABLED BLOCKING CLIENT]
@@ -97,7 +100,6 @@ char *strstrip(char *s)
 {
         size_t size;
         char *end;
-
         size = strlen(s);
 
         if (!size)
@@ -127,12 +129,12 @@ int importSingleModule(char* token, PyObject *pGlobal) {
                 char* package = extractImportedPackageName(token);
 
                 if (NULL != package) {
-                        printf("Importing package %s\n", package);
+                        printf("[IMPORT] Importing package %s\n", package);
                         PyObject *impmod = PyImport_ImportModule(package);
                         if (NULL == impmod)
-                                printf("Package %s not found\n", package);
+                                printf("[IMPORT] Package %s not found\n", package);
                         else {
-                                printf("Package %s imported\n", package);
+                                printf("[IMPORT] Package %s imported\n", package);
                                 PyMapping_SetItemString(pGlobal, package, impmod);
                                 return 1;
                         }
@@ -149,7 +151,7 @@ char* importModules(char* code, PyObject *pGlobal) {
         char* token = strtok(code, "\n");
 
         while( token != NULL ) {
-                printf( "token: %s\n", token);
+                // [DEBUG] printf( "token: %s\n", token);
                 int imported = importSingleModule(token, pGlobal);
                 if (!imported) {
                         sprintf(trimmed_code, "%s%s\n", trimmed_code, token);
@@ -162,7 +164,7 @@ char* importModules(char* code, PyObject *pGlobal) {
 
 char* PyExecCode(char* code, char* func, char* arg)
 {
-        printf("Starting PyExecCode: running %s(%s) with code:\n%s\n", func, arg, code);
+        printf("[PyExecCode] running %s(%s) with code:\n%s\n", func, arg, code);
 
         PyObject *pName, *pModule, *pArgs, *pValue, *pFunc;
         PyObject *pGlobal = PyDict_New();
@@ -213,11 +215,11 @@ char* PyExecCode(char* code, char* func, char* arg)
                 rv = (char*)RedisModule_Alloc(sizeof(char)*(strlen(ret_str) + 1));
                 rv = strcpy(rv, ret_str);
 
-                printf("Returned val: %s\n", rv);
+                printf("[PyExecCode] Python kernel returned: %s\n", rv);
                 Py_DECREF(pValue);
         }
         else {
-                printf("NULL pValue returned\n");
+                printf("[PyExecCode] Python kernel returned no value, please check kernel correctness\n");
         }
 
         Py_XDECREF(pFunc);
@@ -238,7 +240,7 @@ char* getValueByKey(RedisModuleCtx *ctx, char* key) {
                 value = RedisModule_CallReplyStringPtr(reply, &len);
                 if (NULL != value) {
                         value = strstrip(value);
-                        printf("Got value %s by key %s\n", value, key);
+                        printf("[REDIS] Got value %s by key %s\n", value, key);
                 }
         }
 
@@ -247,7 +249,7 @@ char* getValueByKey(RedisModuleCtx *ctx, char* key) {
 
 void runPyFromRedis(RedisModuleCtx *ctx, RedisModuleString **argv, int argc, char* next_py) {
 
-        printf("Next py is: '%s'\n", next_py);
+        printf("[runPyFromRedis] Next python kernel is: '%s'\n", next_py);
 
         int lpar = strstr(next_py, "(") - next_py;
         int rpar = strstr(next_py, ")") - next_py;
@@ -255,19 +257,19 @@ void runPyFromRedis(RedisModuleCtx *ctx, RedisModuleString **argv, int argc, cha
         char* next_func = (char*)RedisModule_Alloc(sizeof(char)*(lpar + 1));
         strncpy(next_func, next_py, lpar);
         next_func[lpar] = '\0';
-        printf("Next function is: '%s'\n", next_func);
+        printf("[runPyFromRedis] \tNext function is: '%s'\n", next_func);
 
         // TODO this is a very shaky code, we need to strip leading/trailing dquotes w/o this +-2
         char* next_func_arg = (char*)RedisModule_Alloc(sizeof(char)*(rpar - lpar + 1));
         strncpy(next_func_arg, strstr(next_py, "(") + 2, rpar - lpar);
         next_func_arg[rpar - lpar - 3] = '\0';
-        printf("Next function arg is: '%s'\n", next_func_arg);
+        printf("[runPyFromRedis] \tNext function arg is: '%s'\n", next_func_arg);
 
         if (next_func_arg[0] == '@') {
                 // It's a Redis KEY, we need to get the value
                 char* value = getValueByKey(ctx, strstrip(next_func_arg + 1));
                 if (NULL == next_func_arg) {
-                        printf("Cannot get %s value, aborting chain\n", value);
+                        printf("[runPyFromRedis] Cannot get %s required value from Redis, aborting chain\n", value);
                 }
                 else {
                         next_func_arg = value;
@@ -276,13 +278,13 @@ void runPyFromRedis(RedisModuleCtx *ctx, RedisModuleString **argv, int argc, cha
 
         char* code = getValueByKey(ctx, next_func);
         if (NULL != code) {
-                printf("Next code is at: %s, code is:\n%s\n", next_py, code);
+                printf("[runPyFromRedis] Next code is at: %s, code is:\n%s\n", next_py, code);
 
                 char* xcode = (char*)RedisModule_Alloc(sizeof(char)*(strlen(code) + strlen(next_func) + 1024));
                 // sprintf(xcode, "%s\n%s", code, next_py);
                 sprintf(xcode, "%s", code);
 
-                printf("Dispatching thread: %s\n", xcode);
+                printf("[runPyFromRedis] Dispatching thread: %s\n", xcode);
 
                 startBlockingClient(ctx,
                                     (long long)(1*1000),
@@ -299,14 +301,14 @@ char* runPyMainModule(char** argv, int argc) {
         int i;
 
         if (argc < 3) {
-                fprintf(stderr,"Usage: call pythonfile funcname [args]\n");
+                fprintf(stderr, "[runPyMainModule] Usage: call pythonfile funcname [args]\n");
                 return NULL;
         }
 
         char* py_module = (char*)RedisModule_StringPtrLen(argv[1], NULL);
         char* py_func = (char*)RedisModule_StringPtrLen(argv[2], NULL);
 
-        fprintf(stdout, "py env: %s, calling %s.%s\n", getenv("PYTHONPATH"), py_module, py_func);
+        printf("[INFO] py env: %s, calling %s.%s\n", getenv("PYTHONPATH"), py_module, py_func);
 
         Py_Initialize();
         pName = PyString_FromString(py_module);
@@ -326,7 +328,7 @@ char* runPyMainModule(char** argv, int argc) {
                                 if (!pValue) {
                                         Py_DECREF(pArgs);
                                         Py_DECREF(pModule);
-                                        fprintf(stderr, "Cannot convert argument\n");
+                                        fprintf(stderr, "[runPyMainModule] Cannot convert argument\n");
                                         return NULL;
                                 }
                                 /* pValue reference stolen here: */
@@ -336,7 +338,7 @@ char* runPyMainModule(char** argv, int argc) {
                         Py_DECREF(pArgs);
                         if (pValue != NULL) {
                                 char* rv = PyString_AsString(pValue);
-                                printf("Result of call:\n%s\n", rv);
+                                printf("[runPyMainModule] Result of call:\n%s\n", rv);
                                 Py_DECREF(pValue);
                                 return rv;
                         }
@@ -344,21 +346,21 @@ char* runPyMainModule(char** argv, int argc) {
                                 Py_DECREF(pFunc);
                                 Py_DECREF(pModule);
                                 PyErr_Print();
-                                fprintf(stderr,"Call failed\n");
+                                fprintf(stderr,"[runPyMainModule] Call failed\n");
                                 return NULL;
                         }
                 }
                 else {
                         if (PyErr_Occurred())
                                 PyErr_Print();
-                        fprintf(stderr, "Cannot find function \"%s\"\n", argv[2]);
+                        fprintf(stderr, "[runPyMainModule] Cannot find function \"%s\"\n", argv[2]);
                 }
                 Py_XDECREF(pFunc);
                 Py_DECREF(pModule);
         }
         else {
                 PyErr_Print();
-                fprintf(stderr, "Failed to load \"%s\"\n", argv[1]);
+                fprintf(stderr, "[runPyMainModule] Failed to load \"%s\"\n", argv[1]);
                 return NULL;
         }
 
@@ -377,13 +379,13 @@ int PyRunCommand_RedisCommand(RedisModuleCtx *ctx, RedisModuleString **argv, int
 
         // Start with a main python read from file
         char* next_py = runPyMainModule(argv, argc);
-        printf("next_py: %s, %d\n", next_py, strlen(next_py));
+        printf("[PYLD.pyrun] Next Python kernel to run: %s, %d\n", next_py, strlen(next_py));
 
         // Get the next function to run, and start the chain
         runPyFromRedis(ctx, argv, argc, next_py);
 
-        printf("\nDone running python function chain, threads may still be running\n\n");
-        next_py = "Py chain done";
+        printf("\n-----------------------------------------------------------------------------\n[PYLD.pyrun] Done running python function chain, threads may still be running\n-----------------------------------------------------------------------------\n\n");
+        next_py = "py chain done";
 
         // Return final value (not really something to write home about)
         RedisModule_ReplyWithStringBuffer(ctx, next_py, strlen(next_py));
