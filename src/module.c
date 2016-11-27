@@ -56,7 +56,7 @@ void *BCL_ThreadMain(void *arg) {
                 runPyFromRedis(ctx, NULL, 0, next_py);
         }
         else {
-          printf("\n--------------------------\nPython kernel chain done\n--------------------------\n");
+                printf("\n--------------------------\nPython kernel chain done\n--------------------------\n");
         }
 
         // [DISABLED BLOCKING CLIENT]
@@ -235,18 +235,27 @@ char* PyExecCode(char* code, char* func, char* arg)
 
 char* getValueByKey(RedisModuleCtx *ctx, char* key) {
         char* value = NULL;
+
+        printf("[getValueByKey] Key is: %s\n", key);
+
         RedisModuleString* rms = RedisModule_CreateString(ctx, key, strlen(key));
         RedisModuleCallReply *reply = RedisModule_Call(ctx, "GET", "s", rms);
 
         if (NULL != reply) {
                 size_t len;
                 const char* replyStr = RedisModule_CallReplyStringPtr(reply, &len);
-                value = (char*)RedisModule_Alloc(sizeof(char)*(strlen(replyStr) + 1));
-                strcpy(value, replyStr);
-                value[strlen(replyStr)] = '\0';
-                if (NULL != value) {
-                        value = strstrip(value);
-                        printf("[REDIS] Got value for key [%s]:\n%s\n\n", key, value);
+                if (NULL != replyStr) {
+                        printf("[getValueByKey] Reply string: %s\n", replyStr);
+                        value = (char*)RedisModule_Alloc(sizeof(char)*(strlen(replyStr) + 1));
+                        strcpy(value, replyStr);
+                        value[strlen(replyStr)] = '\0';
+                        if (NULL != value) {
+                                value = strstrip(value);
+                                printf("[REDIS] Got value for key [%s]:\n%s\n\n", key, value);
+                        }
+                }
+                else {
+                  printf("Cannot find key %s, aborting\n", key);
                 }
         }
 
@@ -274,8 +283,9 @@ void runPyFromRedis(RedisModuleCtx *ctx, RedisModuleString **argv, int argc, cha
         if (next_func_arg[0] == '@') {
                 // It's a Redis KEY, we need to get the value
                 char* value = getValueByKey(ctx, strstrip(next_func_arg + 1));
-                if (NULL == next_func_arg) {
-                        printf("[runPyFromRedis] Cannot get %s required value from Redis, aborting chain\n", value);
+                if (NULL == value) {
+                        printf("[runPyFromRedis] Cannot get %s required value from Redis, aborting chain\n", next_func_arg);
+                        return;
                 }
                 else {
                         next_func_arg = value;
