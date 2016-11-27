@@ -85,17 +85,28 @@ Once it returns the next function would be looked up in Redis using its name as 
     def _utility_function():
       ...
 
-__Note!__ We currently support _only_ one string formal parameter, or Redis KEY whose value would be provided as the input string.
 
-__Note!__ all imports would be treated as global imports.
-
-__Note!__ 'from X import Y' form is not currently supported.
-
-__Note!__ Access to Redis via network APIs is forbidden.
+- We currently support _only one_ string formal parameter, or Redis KEY whose value would be provided as the input string.
+- Kernels have no module, they are automatically run within a unified internal module created by the Pyrecks runtime
+- All imports would be treated as global imports.
+- The 'from X import Y' form is not currently supported.
+- Access to Redis via network APIs is forbidden form within a kernel.
 
 ### Future Development
-- Support var args in kernel functions
-- Consider a _yield_ based model
+- Remove the _start.py_ script, and run the first in line kernel from a Redis KEY directly.
+
+- Support var args in kernel functions, of any type. Due to the nature of the PY/C bridge we may need to enforce a _type_ declaration scheme (in Python!) to tell the module, ahead of time, how to interpret each argument.
+
+- Add a syntactical element to the kernels' return statement, where they provide a set of key-value pairs to be SET in Redis. This way we can allow the kernels to be stateless threads, no side effects capsules, that can save any requested state in the Redis itself. The saved state can be used by the same kernel, or other kernels.
+This may look something like:
+
+  <pre>return "next_func_to_call(%s, %s, %s) SET [(%s,%s), (%s, %s)]" % (x, y, z, key1, value1, key2, value2)</pre>
+
+- Compile each kernel on-demand (i.e. when it is first accessed). Put the compiled version under a KEY comprised of the function name concatenated to the string _pyc_. When a kernel needs to be run (as called by a previous one), first check if there is a compiled version, and use it. Else compile, save the compiled version and run.
+This way we lose the ability to hot patch kernels, but we can try to think about some signature mechanism to allow that too, where we know if the original Python kernel was modified from it _pyc_ version.
+
+- Provide a simple Python script to take any number of Python kernel scripts, transform them to one-liners, and SET them in Redis as a batch. This should simplify the preparation process.
+
 
 ---
-Contact me at doron.shamia@gmail.com
+For any questions please contact me at __*doron.shamia@gmail.com*__
